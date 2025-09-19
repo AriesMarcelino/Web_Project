@@ -1,4 +1,16 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+set_error_handler(function ($errno, $errstr, $errfile, $errline) {
+    error_log("PHP Error [$errno]: $errstr in $errfile on line $errline");
+});
+set_exception_handler(function ($e) {
+    error_log("Uncaught Exception: " . $e->getMessage());
+    http_response_code(500);
+    echo "An unexpected error occurred. Please try again later.";
+});
+
 session_start();
 include "classes.php";
 

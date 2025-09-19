@@ -1,11 +1,34 @@
 <?php
+// Enable full error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Hide errors from users
+ini_set('log_errors', 1);
+ini_set('error_log', 'php_errors.log');
+
+// Custom error handler function
+function customErrorHandler($errno, $errstr, $errfile, $errline) {
+    $error_message = "[Error $errno] $errstr in $errfile on line $errline";
+    error_log($error_message);
+    // Optionally display a generic message to users
+    echo "An internal error occurred. Please try again later.";
+    return true; // Prevent PHP internal error handler
+}
+
+// Set the custom error handler
+set_error_handler("customErrorHandler");
+
 class Database {
     private $conn;
 
     public function __construct() {
-        $this->conn = new mysqli("localhost", "root", "", "portfolio_db");
-        if ($this->conn->connect_error) {
-            die("Connection failed: " . $this->conn->connect_error);
+        try {
+            $this->conn = new mysqli("localhost", "root", "", "portfolio_db");
+            if ($this->conn->connect_error) {
+                throw new Exception("Connection failed: " . $this->conn->connect_error);
+            }
+        } catch (Exception $e) {
+            error_log("Database connection error in Database class: " . $e->getMessage());
+            die("Database connection failed. Please try again later.");
         }
     }
     public function getConnection() {
@@ -21,59 +44,74 @@ class User {
     }
     // Update main user info: bio, background, years_experience, email
     public function updateUserInfo($user_id, $bio, $background, $years_experience, $email) {
-        $conn = $this->db->getConnection();
-        $sql = "UPDATE users SET bio = ?, background = ?, years_experience = ?, email = ? WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssisi", $bio, $background, $years_experience, $email, $user_id);
-        return $stmt->execute();
+        try {
+            $conn = $this->db->getConnection();
+            $sql = "UPDATE users SET bio = ?, background = ?, years_experience = ?, email = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("ssisi", $bio, $background, $years_experience, $email, $user_id);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log("Error in updateUserInfo: " . $e->getMessage());
+            return false;
+        }
     }
 
     // Helper function to delete all entries from a pivot table for a user
     private function deleteFromTable($table, $user_id) {
-        $conn = $this->db->getConnection();
-        $sql = "DELETE FROM $table WHERE user_id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $user_id);
-        return $stmt->execute();
+        try {
+            $conn = $this->db->getConnection();
+            $sql = "DELETE FROM $table WHERE user_id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $user_id);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log("Error in deleteFromTable: " . $e->getMessage());
+            return false;
+        }
     }
 
     // Update skills pivot table
     public function updateSkills($user_id, $skills) {
-    // Clear existing skills for the user
-    $this->deleteFromTable('skill_user', $user_id);
-    if (empty($skills)) return true;
+        try {
+            // Clear existing skills for the user
+            $this->deleteFromTable('skill_user', $user_id);
+            if (empty($skills)) return true;
 
-    $conn = $this->db->getConnection();
+            $conn = $this->db->getConnection();
 
-    foreach ($skills as $skill_name) {
-        $skill_name = trim(($skill_name));
-        if ($skill_name === '') continue;
+            foreach ($skills as $skill_name) {
+                $skill_name = trim(($skill_name));
+                if ($skill_name === '') continue;
 
-        // Check if skill already exists
-        $checkSkill = $conn->prepare("SELECT id FROM skills WHERE skill_name = ?");
-        $checkSkill->bind_param("s", $skill_name);
-        $checkSkill->execute();
-        $result = $checkSkill->get_result();
-        $skill = $result->fetch_assoc();
+                // Check if skill already exists
+                $checkSkill = $conn->prepare("SELECT id FROM skills WHERE skill_name = ?");
+                $checkSkill->bind_param("s", $skill_name);
+                $checkSkill->execute();
+                $result = $checkSkill->get_result();
+                $skill = $result->fetch_assoc();
 
-        if ($skill) {
-            $skill_id = $skill['id'];
-        } else {
-    
-            $insertSkill = $conn->prepare("INSERT INTO skills (skill_name) VALUES (?)");
-            $insertSkill->bind_param("s", $skill_name);
-            $insertSkill->execute();
-            $skill_id = $conn->insert_id;
+                if ($skill) {
+                    $skill_id = $skill['id'];
+                } else {
+
+                    $insertSkill = $conn->prepare("INSERT INTO skills (skill_name) VALUES (?)");
+                    $insertSkill->bind_param("s", $skill_name);
+                    $insertSkill->execute();
+                    $skill_id = $conn->insert_id;
+                }
+
+                // Insert into pivot table
+                $insertPivot = $conn->prepare("INSERT INTO skill_user (user_id, skill_id) VALUES (?, ?)");
+                $insertPivot->bind_param("ii", $user_id, $skill_id);
+                $insertPivot->execute();
+            }
+
+            return true;
+        } catch (Exception $e) {
+            error_log("Error in updateSkills: " . $e->getMessage());
+            return false;
         }
-
-        // Insert into pivot table
-        $insertPivot = $conn->prepare("INSERT INTO skill_user (user_id, skill_id) VALUES (?, ?)");
-        $insertPivot->bind_param("ii", $user_id, $skill_id);
-        $insertPivot->execute();
     }
-
-    return true;
-}
     // Update hobbies pivot table
     public function updateHobbies($user_id, $hobbies) {
     // Clear existing hobbies for the user
