@@ -104,49 +104,114 @@ if ($current_user_id && $current_user_id != $user['id']) {
 <head>
     <title><?php echo $user['username']; ?>'s Profile</title>
     <link rel="stylesheet" href="profile.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        function toggleEdit() {
-            var viewMode = document.getElementById('view-mode');
-            var editMode = document.getElementById('edit-mode');
-            if (viewMode.style.display === 'none') {
-                viewMode.style.display = 'block';
-                editMode.style.display = 'none';
-            } else {
-                viewMode.style.display = 'none';
-                editMode.style.display = 'block';
-            }
-        }
-        function addInput(containerId, fields) {
-            var container = document.getElementById(containerId);
-            fields.forEach(function(field) {
-                var input = document.createElement('input');
-                input.type = field.type || 'text';
-                input.name = field.name;
-                input.placeholder = field.placeholder || 'Add new';
-                container.appendChild(input);
-            });
-        }
-        function addSocialMediaInput() {
-            var container = document.getElementById('social_media-container');
-            var platformInput = document.createElement('input');
-            platformInput.type = 'text';
-            platformInput.name = 'social_media_platforms[]';
-            platformInput.placeholder = 'Platform';
-            var urlInput = document.createElement('input');
-            urlInput.type = 'text';
-            urlInput.name = 'social_media_urls[]';
-            urlInput.placeholder = 'URL';
-            container.appendChild(platformInput);
-            container.appendChild(urlInput);
-        }
+        $(document).ready(function() {
+            // Improved toggle edit function with smooth animation
+            window.toggleEdit = function() {
+                $('#view-mode, #edit-mode').slideToggle(300);
+            };
 
-        // Handle follower/following clicks
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('followers').addEventListener('click', function() {
+            // Improved addInput function with jQuery
+            window.addInput = function(containerId, fields) {
+                var container = $('#' + containerId);
+                var inputGroup = $('<div class="input-group"></div>');
+
+                fields.forEach(function(field) {
+                    var input = $('<input>', {
+                        type: field.type || 'text',
+                        name: field.name,
+                        placeholder: field.placeholder || 'Add new',
+                        class: 'dynamic-input'
+                    });
+                    inputGroup.append(input);
+                });
+
+                // Add remove button
+                var removeBtn = $('<button type="button" class="remove-btn">Remove</button>');
+                removeBtn.click(function() {
+                    inputGroup.fadeOut(300, function() {
+                        $(this).remove();
+                    });
+                });
+                inputGroup.append(removeBtn);
+
+                container.append(inputGroup);
+                inputGroup.hide().slideDown(300);
+            };
+
+            // Handle follower/following clicks with smooth transitions
+            $('#followers').click(function() {
+                $(this).fadeTo(200, 0.5).fadeTo(200, 1.0);
                 window.location.href = 'followers.php?username=<?php echo urlencode($user['username']); ?>&type=followers';
             });
-            document.getElementById('following').addEventListener('click', function() {
+
+            $('#following').click(function() {
+                $(this).fadeTo(200, 0.5).fadeTo(200, 1.0);
                 window.location.href = 'followers.php?username=<?php echo urlencode($user['username']); ?>&type=following';
+            });
+
+            // Real-time search functionality
+            $('.search-form input[name="search_username"]').on('input', function() {
+                var query = $(this).val();
+                if (query.length >= 2) {
+        
+                    $(this).addClass('searching');
+                } else {
+                    $(this).removeClass('searching');
+                }
+            });
+
+            // Enhanced form validation
+            $('#edit-mode form').on('submit', function(e) {
+                var form = $(this);
+                var isValid = true;
+
+                // Check required fields
+                form.find('input[required], textarea[required]').each(function() {
+                    if (!$(this).val().trim()) {
+                        $(this).addClass('error');
+                        isValid = false;
+                    } else {
+                        $(this).removeClass('error');
+                    }
+                });
+
+                // Email validation
+                var emailField = form.find('input[type="email"]');
+                if (emailField.length && emailField.val()) {
+                    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(emailField.val())) {
+                        emailField.addClass('error');
+                        isValid = false;
+                    }
+                }
+
+                if (!isValid) {
+                    e.preventDefault();
+                    alert('Please fill in all required fields correctly.');
+                }
+            });
+
+            $('.navbar a[href^="#"]').click(function(e) {
+                e.preventDefault();
+                var target = $($(this).attr('href'));
+                if (target.length) {
+                    $('html, body').animate({
+                        scrollTop: target.offset().top - 50
+                    }, 500);
+                }
+            });
+
+            $('input[name="profile_picture"]').change(function() {
+                var file = this.files[0];
+                if (file) {
+                    var fileSize = (file.size / 1024 / 1024).toFixed(2);
+                    if (fileSize > 5) {
+                        alert('File size must be less than 5MB');
+                        $(this).val('');
+                    }
+                }
             });
         });
     </script>
@@ -209,7 +274,6 @@ if ($current_user_id && $current_user_id != $user['id']) {
                 </button>
             </form>
         <?php endif; ?>
-        <!-- Removed Resume button -->
         
         <hr class="separator">
     </div>

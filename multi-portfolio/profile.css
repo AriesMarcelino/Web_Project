@@ -290,3 +290,210 @@ body {
 #edit-mode button[type="button"]:hover {
     background: #2980b9;
 }
+
+/* jQuery Enhanced Features */
+.input-group {
+    display: flex;
+    align-items: center;
+    margin: 10px 0;
+    padding: 10px;
+    background: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.input-group:hover {
+    background: #f0f8ff;
+    border-color: #3498db;
+}
+
+.dynamic-input {
+    flex: 1;
+    margin-right: 10px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.dynamic-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.remove-btn {
+    background: #e74c3c !important;
+    color: white !important;
+    border: none !important;
+    padding: 6px 12px !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    font-size: 12px !important;
+    transition: all 0.3s ease !important;
+    margin: 0 !important;
+}
+
+.remove-btn:hover {
+    background: #c0392b !important;
+    transform: scale(1.05);
+}
+
+/* Form validation styles */
+.error {
+    border-color: #e74c3c !important;
+    background-color: #ffe6e6 !important;
+    box-shadow: 0 0 5px rgba(228, 76, 60, 0.3) !important;
+}
+
+.error:focus {
+    border-color: #e74c3c !important;
+    box-shadow: 0 0 5px rgba(228, 76, 60, 0.5) !important;
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #3498db;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Search functionality */
+.searching {
+    background-color: #e8f4fd;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+}
+
+.search-form {
+    position: relative;
+}
+
+.search-form input {
+    transition: all 0.3s ease;
+}
+
+/* Button loading states */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* Smooth transitions for dynamic content */
+.dynamic-content {
+    transition: all 0.3s ease;
+}
+
+/* Enhanced button styles */
+.btn-follow {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.btn-follow:disabled {
+    background: #95a5a6 !important;
+}
+
+/* Profile picture upload enhancement */
+.profile-pic input[type="file"] {
+    margin: 10px 0;
+    padding: 5px;
+    border: 2px dashed #bdc3c7;
+    border-radius: 5px;
+    background: #f9f9f9;
+    transition: all 0.3s ease;
+}
+
+.profile-pic input[type="file"]:hover {
+    border-color: #3498db;
+    background: #e8f4fd;
+}
+
+/* Success message styling */
+.success-message {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px;
+    border-radius: 5px;
+    margin: 10px 0;
+    border: 1px solid #c3e6cb;
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Enhanced navigation */
+.navbar a {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.navbar a:hover {
+    transform: translateY(-2px);
+}
+
+/* Stats enhancement */
+.stats span {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.stats span:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+/* Responsive design for jQuery features */
+@media (max-width: 768px) {
+    .input-group {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dynamic-input {
+        margin-right: 0;
+        margin-bottom: 10px;
+    }
+
+    .remove-btn {
+        align-self: center;
+        width: 100px;
+    }
+
+    .layout {
+        max-width: 95%;
+    }
+}

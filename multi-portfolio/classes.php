@@ -1,7 +1,7 @@
 <?php
 // Enable full error reporting
 error_reporting(E_ALL);
-ini_set('display_errors', 0); // Hide errors from users
+ini_set('display_errors', 0); 
 ini_set('log_errors', 1);
 ini_set('error_log', 'php_errors.log');
 
@@ -14,7 +14,6 @@ function customErrorHandler($errno, $errstr, $errfile, $errline) {
     return true; // Prevent PHP internal error handler
 }
 
-// Set the custom error handler
 set_error_handler("customErrorHandler");
 
 class Database {
@@ -629,9 +628,12 @@ class Admin extends User {
         $result = $stmt->get_result();
         if ($result->num_rows > 0) {
             $user = $result->fetch_assoc();
-                        // Verify password hash
+            // Verify password hash
             if (password_verify($password, $user['password'])) {
-                session_start();
+                // Only start session if not already started
+                if (session_status() == PHP_SESSION_NONE) {
+                    session_start();
+                }
                 $_SESSION['admin_id'] = $user['id'];
                 $_SESSION['username'] = $user['username'];
                 return $user;
