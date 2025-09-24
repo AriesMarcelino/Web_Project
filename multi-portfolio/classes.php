@@ -4,7 +4,6 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); 
 ini_set('log_errors', 1);
 ini_set('error_log', 'php_errors.log');
-
 // Custom error handler function
 function customErrorHandler($errno, $errstr, $errfile, $errline) {
     $error_message = "[Error $errno] $errstr in $errfile on line $errline";
@@ -13,12 +12,9 @@ function customErrorHandler($errno, $errstr, $errfile, $errline) {
     echo "An internal error occurred. Please try again later.";
     return true; // Prevent PHP internal error handler
 }
-
 set_error_handler("customErrorHandler");
-
 class Database {
     private $conn;
-
     public function __construct() {
         try {
             $this->conn = new mysqli("localhost", "root", "", "portfolio_db");
@@ -54,7 +50,6 @@ class User {
             return false;
         }
     }
-
     // Helper function to delete all entries from a pivot table for a user
     private function deleteFromTable($table, $user_id) {
         try {
@@ -68,7 +63,6 @@ class User {
             return false;
         }
     }
-
     // Update skills pivot table
     public function updateSkills($user_id, $skills) {
         try {
@@ -98,13 +92,11 @@ class User {
                     $insertSkill->execute();
                     $skill_id = $conn->insert_id;
                 }
-
                 // Insert into pivot table
                 $insertPivot = $conn->prepare("INSERT INTO skill_user (user_id, skill_id) VALUES (?, ?)");
                 $insertPivot->bind_param("ii", $user_id, $skill_id);
                 $insertPivot->execute();
             }
-
             return true;
         } catch (Exception $e) {
             error_log("Error in updateSkills: " . $e->getMessage());
@@ -149,7 +141,6 @@ class User {
 
     return true;
 }
-
     // Update projects pivot table
     public function updateProjects($user_id, $projects, $descriptions = []) {
     // Clear existing project associations for the user
@@ -181,7 +172,6 @@ class User {
             $insertProject->execute();
             $project_id = $conn->insert_id;
         }
-
         // Insert into pivot table
         $insertPivot = $conn->prepare("INSERT INTO project_user (user_id, project_id) VALUES (?, ?)");
         $insertPivot->bind_param("ii", $user_id, $project_id);
@@ -189,8 +179,7 @@ class User {
     }
 
     return true;
-}
-
+    }
     // Update awards pivot table
    public function updateAwards($user_id, $awards, $years = []) {
     // Clear existing award associations for the user
@@ -263,7 +252,6 @@ class User {
             $insertCertificate->execute();
             $certificate_id = $conn->insert_id;
         }
-
         // Insert into pivot table
         $insertPivot = $conn->prepare("INSERT INTO certificate_user (user_id, certificate_id) VALUES (?, ?)");
         $insertPivot->bind_param("ii", $user_id, $certificate_id);
@@ -641,10 +629,9 @@ class Admin extends User {
         }
         return false;
     }
-
     public function getAllUsers() {
         $conn = $this->db->getConnection();
-        $sql = "SELECT * FROM portfolio_db WHERE deleted_at IS NULL ORDER BY id";
+        $sql = "SELECT * FROM users WHERE deleted_at IS NULL ORDER BY id";
         $result = $conn->query($sql);
         $users = [];
         while ($row = $result->fetch_assoc()) {
@@ -678,6 +665,3 @@ class Admin extends User {
         return $stmt->execute();
     }
 }
-?>
-
-

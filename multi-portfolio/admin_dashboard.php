@@ -1,54 +1,184 @@
 <?php
-session_start();
-include "db.php";
-include "classes.php";
-
-if (!isset($_SESSION['admin_id'])) {
-    header("Location: login.php");
-    exit();
+// Start session only if not already started
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
 }
 
+// Include database connection
+include "db.php";
+
+// Check if user is logged in as admin
+if (!isset($_SESSION['admin_id'])) {
+    // Detect AJAX request
+    $isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    if ($isAjax) {
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'Session expired. Please log in again.'
+        ]);
+        exit();
+    } else {
+        header("Location: login.php");
+        exit();
+    }
+}
+
+// Handle POST requests (AJAX operations)
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Handle user creation
     if (isset($_POST['create'])) {
         $username = $conn->real_escape_string($_POST['username']);
-        $password = $_POST['password'];
+        $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Hash the password
         $email = $conn->real_escape_string($_POST['email']);
-        $sql = "INSERT INTO users (username, password, email) VALUES ('$username', '$password', '$email')";
-        $conn->query($sql);
-    } elseif (isset($_POST['update'])) {
+        
+        try {
+            $sql = "INSERT INTO users (username, password, email) VALUES ('$username', '$password', '$email')";
+            if ($conn->query($sql)) {
+                $user_id = $conn->insert_id;
+                // Fetch the newly created user data
+                $result = $conn->query("SELECT id, username, email FROM users WHERE id=$user_id");
+                $user = $result->fetch_assoc();
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'user_id' => $user['id'],
+                    'username' => $user['username'],
+                    'email' => $user['email']
+                ]);
+            } else {
+                throw new Exception($conn->error);
+            }
+        } catch (mysqli_sql_exception $e) {
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Username or email already exists. Please choose a different one.'
+                ]);
+            } else {
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Error creating user: ' . $e->getMessage()
+                ]);
+            }
+        }
+        exit();
+        }
+
+    // Handle user update
+    elseif (isset($_POST['update'])) {
         $id = (int)$_POST['id'];
         $username = $conn->real_escape_string($_POST['username']);
         $email = $conn->real_escape_string($_POST['email']);
         $sql = "UPDATE users SET username='$username', email='$email' WHERE id=$id";
-        $conn->query($sql);
+        $success = $conn->query($sql);
+        if (!$success) {
+            error_log("Update failed: " . $conn->error);
+        }
+        header('Content-Type: application/json');
+        if ($success) {
+            // Fetch updated user data
+            $result = $conn->query("SELECT id, username, email FROM users WHERE id=$id");
+            $user = $result->fetch_assoc();
+            echo json_encode([
+                'success' => true,
+                'user' => $user
+            ]);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Error updating user: ' . $conn->error
+            ]);
+        }
+        exit();
+    }
 
-    // Fetch updated user data
-    $result = $conn->query("SELECT id, username, email FROM users WHERE id=$id");
-    $user = $result->fetch_assoc();
-
-    // Return JSON response for AJAX
-    header('Content-Type: application/json');
-    echo json_encode([
-        'success' => true,
-        'user' => $user
-    ]);
-    exit();
-}
-    } elseif (isset($_POST['delete'])) {
+    // Handle user deletion
+    elseif (isset($_POST['delete'])) {
         $id = (int)$_POST['id'];
-        $sql = "UPDATE users SET deleted_at=NOW() WHERE id=$id";
-        $conn->query($sql);
-    }
+        // Validate user ID
+        if ($id <= 0) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Invalid user ID'
+            ]);
+            exit();
+        }
+        // Check if user exists before deletion
+        $check_sql = "SELECT id, username FROM users WHERE id = ? AND deleted_at IS NULL";
+        $check_stmt = $conn->prepare($check_sql);
+        $check_stmt->bind_param("i", $id);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
+        if ($check_result->num_rows === 0) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'User not found or already deleted'
+            ]);
+            exit();
+        }
+        $user = $check_result->fetch_assoc();
+        // Start transaction for data integrity
+        $conn->begin_transaction();
+        try {
+            // Delete from pivot tables first (to avoid foreign key constraint issues)
+            $pivot_tables = [
+                'skill_user',
+                'hobby_user',
+                'project_user',
+                'award_user',
+                'certificate_user',
+                'social_media_user',
+            ];
+            foreach ($pivot_tables as $table) {
+                $delete_sql = "DELETE FROM $table WHERE user_id = ?";
+                $delete_stmt = $conn->prepare($delete_sql);
+                $delete_stmt->bind_param("i", $id);
+                $delete_stmt->execute();
+            }
+            // Finally, mark user as deleted
+            $sql = "UPDATE users SET deleted_at = NOW() WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("i", $id);
 
-    // Fetch users
-    $sql = "SELECT * FROM users WHERE deleted_at IS NULL ORDER BY id";
-    $result = $conn->query($sql);
-    $users = [];
-    while ($row = $result->fetch_assoc()) {
-        $users[] = $row;
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                $conn->commit();
+                error_log("User deleted successfully: ID $id, Username: " . $user['username']);
+                header('Content-Type: application/json');
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'User deleted successfully'
+                ]);
+                exit();
+            } else {
+                throw new Exception("Failed to delete user");
+            }
+
+        } catch (Exception $e) {
+            $conn->rollback();
+            error_log("Error deleting user $id: " . $e->getMessage());
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => false,
+                'message' => 'Error deleting user: ' . $e->getMessage()
+            ]);
+            exit();
+        }
     }
+}
+
+// Fetch users for display
+$sql = "SELECT * FROM users WHERE deleted_at IS NULL ORDER BY id";
+$result = $conn->query($sql);
+$users = [];
+while ($row = $result->fetch_assoc()) {
+    $users[] = $row;
+}
 ?>
-
 <!DOCTYPE html>
 <html>
 <head>
@@ -111,13 +241,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="loading" id="loading">
         <div>Processing...</div>
     </div>
-
     <header>
         <button class="menu-toggle">☰</button>
         <h1>Admin Dashboard</h1>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
-
     <aside class="sidebar">
         <ul>
             <li><a href="admin_dashboard.php">Dashboard</a></li>
@@ -192,7 +320,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $('.sidebar').toggleClass('collapsed');
                 $('.main-content').toggleClass('expanded');
             });
-
             // Set active menu item
             const currentPage = window.location.pathname.split('/').pop();
             $('.sidebar a').each(function() {
@@ -200,17 +327,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $(this).parent().addClass('active');
                 }
             });
-
             // Show loading spinner
             function showLoading() {
                 $('#loading').show();
             }
-
             // Hide loading spinner
             function hideLoading() {
                 $('#loading').hide();
             }
-
             // Show message
             function showMessage(message, type = 'success') {
                 const messageDiv = $('<div>')
@@ -224,18 +348,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     messageDiv.fadeOut();
                 }, 3000);
             }
-
             // Create user AJAX
             $('#create-user-form').on('submit', function(e) {
                 e.preventDefault();
-
                 const formData = $(this).serialize();
                 const createBtn = $('#create-btn');
                 const originalText = createBtn.text();
-
                 createBtn.text('Creating...').prop('disabled', true);
                 showLoading();
-
                 $.ajax({
                     url: 'admin_dashboard.php',
                     type: 'POST',
@@ -243,11 +363,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     success: function(response) {
                         hideLoading();
                         createBtn.text(originalText).prop('disabled', false);
-
                         if (response.success) {
                             showMessage('User created successfully!');
                             $('#create-user-form')[0].reset();
-
                             // Add new user to table
                             const newRow = `
                                 <tr data-user-id="${response.user_id}">
@@ -266,7 +384,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                                 </tr>
                             `;
                             $('#users-table tbody').append(newRow);
-
                             // Update dashboard cards
                             updateDashboardCards();
                         } else {
@@ -280,31 +397,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
                 });
             });
-
             // Update user AJAX
             $(document).on('submit', '.update-form', function(e) {
                 e.preventDefault();
-
                 const form = $(this);
                 const formData = form.serialize();
                 const updateBtn = form.find('.update-btn');
                 const originalText = updateBtn.text();
                 const userId = form.data('user-id');
-
                 updateBtn.text('Updating...').prop('disabled', true);
                 showLoading();
-
                 $.ajax({
                     url: 'admin_dashboard.php',
                     type: 'POST',
                     data: formData + '&update=1',
+                    dataType:'json',
                     success: function(response) {
                         hideLoading();
                         updateBtn.text(originalText).prop('disabled', false);
-
                         if (response.success) {
                             showMessage('User updated successfully!');
-
                             // Update the table row
                             const row = form.closest('tr');
                             const newData = response.user;
@@ -323,30 +435,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }
                 });
             });
-
             // Delete user AJAX
             $(document).on('click', '.delete-btn', function() {
                 const userId = $(this).data('user-id');
                 const row = $(this).closest('tr');
-
                 if (confirm('Are you sure you want to delete this user?')) {
                     const deleteBtn = $(this);
                     const originalText = deleteBtn.text();
-
                     deleteBtn.text('Deleting...').prop('disabled', true);
                     showLoading();
-
                     $.ajax({
                         url: 'admin_dashboard.php',
                         type: 'POST',
                         data: { id: userId, delete: 1 },
+                        dataType:'json',
                         success: function(response) {
                             hideLoading();
                             deleteBtn.text(originalText).prop('disabled', false);
-
                             if (response.success) {
                                 showMessage('User deleted successfully!');
-                                row.fadeOut(function() {
+                                 row.fadeOut(function() {
                                     $(this).remove();
                                     updateDashboardCards();
                                 });
@@ -362,7 +470,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     });
                 }
             });
-
             // Update dashboard cards
             function updateDashboardCards() {
                 const totalUsers = $('#users-table tbody tr').length;
@@ -370,12 +477,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     return $(this).find('td:nth-child(2)').text().indexOf('admin') === -1;
                 }).length;
                 const admins = totalUsers - activeUsers;
-
                 $('.card:nth-child(1) p').text(totalUsers);
                 $('.card:nth-child(2) p').text(activeUsers);
                 $('.card:nth-child(3) p').text(admins);
             }
-
             // Form validation
             function validateForm(form) {
                 const inputs = form.find('input[required]');
@@ -389,10 +494,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         $(this).removeClass('error');
                     }
                 });
-
                 return isValid;
             }
-
             // Add CSS for error inputs
             const style = $('<style>').text(`
                 input.error {

@@ -1,6 +1,7 @@
 <?php
-require_once 'db.php'; // Replace with your actual DB connection file
+require_once 'db.php'; // Include database connection
 
+// Create database connection
 $conn = new mysqli("localhost", "root", "", "portfolio_db");
 
 $username = 'administrator'; // Set your desired username
