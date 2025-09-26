@@ -18,63 +18,63 @@ $userObj = new User();
 $current_user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
 // Handle profile update POST request
-        if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile']) && $current_user_id) {
-            if ($current_user_id != $_POST['user_id']) {
-                echo "Unauthorized update attempt.";
-                exit();
-            }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile']) && $current_user_id) {
+    if ($current_user_id != $_POST['user_id']) {
+        echo "Unauthorized update attempt.";
+        exit();
+    }
 
-            // Handle profile picture upload
-            if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] !== UPLOAD_ERR_NO_FILE) {
-                $upload_result = $userObj->uploadProfilePicture($current_user_id, $_FILES['profile_picture']);
-                if ($upload_result !== true) {
-                    echo "<p style='color:red;'>Error uploading profile picture: " . htmlspecialchars($upload_result) . "</p>";
-                }
-            }
-
-            // Sanitize and collect user inputs
-            $bio = $_POST['bio'] ?? '';
-            $background = $_POST['background'] ?? '';
-            $years_experience = intval($_POST['years_experience'] ?? 0);
-            $email = $_POST['email'] ?? '';
-
-            // Update main user info
-            $userObj->updateUserInfo($current_user_id, $bio, $background, $years_experience, $email);
-
-            // Update pivot tables
-            $userObj->updateSkills($current_user_id, $_POST['skills'] ?? []);
-            $userObj->updateHobbies($current_user_id, $_POST['hobbies'] ?? []);
-            $userObj->updateProjects($current_user_id, $_POST['projects'] ?? [], $_POST['project_descriptions'] ?? []);
-            $userObj->updateAwards($current_user_id, $_POST['awards'] ?? [], $_POST['award_years'] ?? []);
-            $userObj->updateCertificates($current_user_id, $_POST['certificates'] ?? [], $_POST['certificate_issuers'] ?? []);
-            
-            // Build social media array
-            $social_media = [];
-            $platforms = $_POST['social_media_platforms'] ?? [];
-            $urls = $_POST['social_media_urls'] ?? [];
-            foreach ($platforms as $index => $platform) {
-                $url = $urls[$index] ?? '';
-                if (trim($platform) !== '' && trim($url) !== '') {
-                    $social_media[] = ['platform' => $platform, 'url' => $url];
-                }
-            }
-            $userObj->updateSocialMedia($current_user_id, $social_media);
-
-            // Reload updated user data
-            $user = $userObj->getUserByUsername($_SESSION['username']);
-        } else {
-            if (isset($_POST['search_username']) && !empty($_POST['search_username'])) {
-                $searched_user = $userObj->getUserByUsername($_POST['search_username']);
-                if ($searched_user) {
-                    $user = $searched_user;
-                }
-            } elseif (isset($_GET['username'])) {
-                $user = $userObj->getUserByUsername($_GET['username']);
-            } else {
-                echo "No profile selected.";
-                exit();
-            }
+    // Handle profile picture upload
+    if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] !== UPLOAD_ERR_NO_FILE) {
+        $upload_result = $userObj->uploadProfilePicture($current_user_id, $_FILES['profile_picture']);
+        if ($upload_result !== true) {
+            echo "<p style='color:red;'>Error uploading profile picture: " . htmlspecialchars($upload_result) . "</p>";
         }
+    }
+
+    // Sanitize and collect user inputs
+    $bio = $_POST['bio'] ?? '';
+    $background = $_POST['background'] ?? '';
+    $years_experience = intval($_POST['years_experience'] ?? 0);
+    $email = $_POST['email'] ?? '';
+
+    // Update main user info
+    $userObj->updateUserInfo($current_user_id, $bio, $background, $years_experience, $email);
+
+    // Update pivot tables
+    $userObj->updateSkills($current_user_id, $_POST['skills'] ?? []);
+    $userObj->updateHobbies($current_user_id, $_POST['hobbies'] ?? []);
+    $userObj->updateProjects($current_user_id, $_POST['projects'] ?? [], $_POST['project_descriptions'] ?? []);
+    $userObj->updateAwards($current_user_id, $_POST['awards'] ?? [], $_POST['award_years'] ?? []);
+    $userObj->updateCertificates($current_user_id, $_POST['certificates'] ?? [], $_POST['certificate_issuers'] ?? []);
+
+    // Build social media array
+    $social_media = [];
+    $platforms = $_POST['social_media_platforms'] ?? [];
+    $urls = $_POST['social_media_urls'] ?? [];
+    foreach ($platforms as $index => $platform) {
+        $url = $urls[$index] ?? '';
+        if (trim($platform) !== '' && trim($url) !== '') {
+            $social_media[] = ['platform' => $platform, 'url' => $url];
+        }
+    }
+    $userObj->updateSocialMedia($current_user_id, $social_media);
+
+    // Reload updated user data
+    $user = $userObj->getUserByUsername($_SESSION['username']);
+} else {
+    if (isset($_POST['search_username']) && !empty($_POST['search_username'])) {
+        $searched_user = $userObj->getUserByUsername($_POST['search_username']);
+        if ($searched_user) {
+            $user = $searched_user;
+        }
+    } elseif (isset($_GET['username'])) {
+        $user = $userObj->getUserByUsername($_GET['username']);
+    } else {
+        echo "No profile selected.";
+        exit();
+    }
+}
 
 if (!$user) {
     echo "User not found!";
@@ -105,6 +105,9 @@ if ($current_user_id && $current_user_id != $user['id']) {
     <title><?php echo $user['username']; ?>'s Profile</title>
     <link rel="stylesheet" href="profile.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Select2 CSS and JS -->
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function() {
             // Improved toggle edit function with smooth animation
@@ -213,6 +216,138 @@ if ($current_user_id && $current_user_id != $user['id']) {
                     }
                 }
             });
+
+            // Initialize Select2 for skills
+            $('#skills-select').select2({
+                placeholder: 'Select skills or type to create new ones...',
+                allowClear: true,
+                tags: true, // Allow custom tags
+                tokenSeparators: [','],
+                width: '100%',
+                createTag: function (params) {
+                    // Allow creation of new tags
+                    if (params.term && params.term.length > 0) {
+                        return {
+                            id: params.term,
+                            text: params.term,
+                            newTag: true
+                        };
+                    }
+                    return null;
+                }
+            });
+
+            // Handle skill selection and creation
+            $('#skills-select').on('change', function() {
+                var selectedValues = $(this).val() || [];
+                updateSkillsDisplay(selectedValues);
+            });
+
+            // Function to update skills display
+            function updateSkillsDisplay(selectedSkills) {
+                var container = $('#skills-display-container');
+                container.empty(); // Clear existing tags
+
+                if (selectedSkills && selectedSkills.length > 0) {
+                    selectedSkills.forEach(function(skill) {
+                        if (skill && skill.trim()) {
+                            var skillTag = $('<span class="skill-tag" data-skill="' + skill + '">' +
+                                skill + '<span class="remove-skill" onclick="removeSkill(this)">×</span></span>');
+                            container.append(skillTag);
+                        }
+                    });
+                }
+            }
+
+            // Function to remove skill
+            window.removeSkill = function(element) {
+                var skillTag = $(element).parent();
+                var skillValue = skillTag.data('skill');
+
+                // Remove from Select2
+                var currentValues = $('#skills-select').val() || [];
+                var newValues = currentValues.filter(function(value) {
+                    return value !== skillValue;
+                });
+                $('#skills-select').val(newValues).trigger('change');
+
+                // Remove the tag with animation
+                skillTag.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            };
+
+            // Initialize skills display on page load
+            var initialSkills = <?php echo json_encode(array_map('trim', $skills)); ?>;
+            if (initialSkills.length > 0) {
+                $('#skills-select').val(initialSkills).trigger('change');
+            }
+
+            // Initialize Select2 for hobbies
+            $('#hobbies-select').select2({
+                placeholder: 'Select hobbies or type to create new ones...',
+                allowClear: true,
+                tags: true, // Allow custom tags
+                tokenSeparators: [','],
+                width: '100%',
+                createTag: function (params) {
+                    // Allow creation of new tags
+                    if (params.term && params.term.length > 0) {
+                        return {
+                            id: params.term,
+                            text: params.term,
+                            newTag: true
+                        };
+                    }
+                    return null;
+                }
+            });
+
+            // Handle hobby selection and creation
+            $('#hobbies-select').on('change', function() {
+                var selectedValues = $(this).val() || [];
+                updateHobbiesDisplay(selectedValues);
+            });
+
+            // Function to update hobbies display
+            function updateHobbiesDisplay(selectedHobbies) {
+                var container = $('#hobbies-display-container');
+                container.empty(); // Clear existing tags
+
+                if (selectedHobbies && selectedHobbies.length > 0) {
+                    selectedHobbies.forEach(function(hobby) {
+                        if (hobby && hobby.trim()) {
+                            var hobbyTag = $('<span class="skill-tag" data-hobby="' + hobby + '">' +
+                                hobby + '<span class="remove-skill" onclick="removeHobby(this)">×</span></span>');
+                            container.append(hobbyTag);
+                        }
+                    });
+                }
+            }
+
+            // Function to remove hobby
+            window.removeHobby = function(element) {
+                var hobbyTag = $(element).parent();
+                var hobbyValue = hobbyTag.data('hobby');
+
+                // Remove from Select2
+                var currentValues = $('#hobbies-select').val() || [];
+                var newValues = currentValues.filter(function(value) {
+                    return value !== hobbyValue;
+                });
+                $('#hobbies-select').val(newValues).trigger('change');
+
+                // Remove the tag with animation
+                hobbyTag.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            };
+
+            // Initialize hobbies display on page load
+            var initialHobbies = <?php echo json_encode(array_map('trim', $hobbies)); ?>;
+            if (initialHobbies.length > 0) {
+                $('#hobbies-select').val(initialHobbies).trigger('change');
+            }
         });
     </script>
 </head>
@@ -381,21 +516,85 @@ if ($current_user_id && $current_user_id != $user['id']) {
                     </div>
                     <div class="section skills">
                         <h3>Skills</h3>
-                        <div id="skills-container">
-                            <?php foreach ($skills as $skill): ?>
-                                <input type="text" name="skills[]" value="<?php echo htmlspecialchars($skill); ?>">
-                            <?php endforeach; ?>
+                        <div class="skills-selection-container">
+                            <div class="skills-select-wrapper">
+                                <select id="skills-select" name="skills[]" multiple="multiple" class="skills-select">
+                                    <?php
+                                    // Predefined skills options
+                                    $predefined_skills = [
+                                        'JavaScript', 'Python', 'Java', 'PHP', 'HTML', 'CSS', 'React', 'Vue.js', 'Angular',
+                                        'Node.js', 'Express.js', 'Django', 'Laravel', 'Spring Boot', 'MySQL', 'PostgreSQL',
+                                        'MongoDB', 'Git', 'Docker', 'AWS', 'Azure', 'Linux', 'Machine Learning', 'Data Science',
+                                        'UI/UX Design', 'Graphic Design', 'Photography', 'Video Editing', 'Content Writing',
+                                        'SEO', 'Digital Marketing', 'Project Management', 'Agile', 'Scrum', 'Leadership',
+                                        'Communication', 'Problem Solving', 'Critical Thinking', 'Teamwork', 'Time Management'
+                                    ];
+
+                                    // Predefined hobbies options
+                                    $predefined_hobbies = [
+                                        'Reading', 'Traveling', 'Cooking', 'Sports', 'Music', 'Gaming', 'Photography',
+                                        'Writing', 'Gardening', 'Painting', 'Dancing', 'Hiking', 'Swimming', 'Cycling',
+                                        'Yoga', 'Meditation', 'Chess', 'Board Games', 'Collecting', 'Volunteering',
+                                        'Learning Languages', 'Coding', 'Blogging', 'Podcasting', 'Filmmaking', 'Sculpting'
+                                    ];
+
+                                    // Get current user's skills
+                                    $current_skills = array_map('trim', $skills);
+
+                                    foreach ($predefined_skills as $skill_option):
+                                        $selected = in_array(trim($skill_option), $current_skills) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo htmlspecialchars($skill_option); ?>" <?php echo $selected; ?>>
+                                            <?php echo htmlspecialchars($skill_option); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div id="selected-skills-display" class="selected-skills-display">
+                                <h4>Selected Skills:</h4>
+                                <div id="skills-display-container" class="skills-display-container">
+                                    <?php foreach ($skills as $skill): ?>
+                                        <span class="skill-tag" data-skill="<?php echo htmlspecialchars($skill); ?>">
+                                            <?php echo htmlspecialchars($skill); ?>
+                                            <span class="remove-skill" onclick="removeSkill(this)">×</span>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
                         </div>
-                        <button type="button" onclick="addInput('skills-container', [{name: 'skills[]'}])">Add Skill</button>
                     </div>
                     <div class="section hobbies">
                         <h3>Hobbies</h3>
-                        <div id="hobbies-container">
-                            <?php foreach ($hobbies as $hobby): ?>
-                                <input type="text" name="hobbies[]" value="<?php echo htmlspecialchars($hobby); ?>">
-                            <?php endforeach; ?>
+                        <div class="skills-selection-container">
+                            <div class="skills-select-wrapper">
+                                <select id="hobbies-select" name="hobbies[]" multiple="multiple" class="skills-select">
+                                    <?php
+                                    // Get current user's hobbies
+                                    $current_hobbies = array_map('trim', $hobbies);
+
+                                    foreach ($predefined_hobbies as $hobby_option):
+                                        $selected = in_array(trim($hobby_option), $current_hobbies) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?php echo htmlspecialchars($hobby_option); ?>" <?php echo $selected; ?>>
+                                            <?php echo htmlspecialchars($hobby_option); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div id="selected-hobbies-display" class="selected-skills-display">
+                                <h4>Selected Hobbies:</h4>
+                                <div id="hobbies-display-container" class="skills-display-container">
+                                    <?php foreach ($hobbies as $hobby): ?>
+                                        <span class="skill-tag" data-hobby="<?php echo htmlspecialchars($hobby); ?>">
+                                            <?php echo htmlspecialchars($hobby); ?>
+                                            <span class="remove-skill" onclick="removeHobby(this)">×</span>
+                                        </span>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+
                         </div>
-                        <button type="button" onclick="addInput('hobbies-container', [{name: 'hobbies[]'}])">Add Hobby</button>
                     </div>
                 </div>
 
