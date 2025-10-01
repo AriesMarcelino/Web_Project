@@ -359,10 +359,10 @@ class User {
 
     public function getSkills($user_id) {
         $conn = $this->db->getConnection();
-        $sql = "SELECT skills.skill_name 
-        FROM `skills` 
-        JOIN skill_user 
-        ON skills.id = skill_user.skill_id 
+        $sql = "SELECT skills.skill_name
+        FROM `skills`
+        JOIN skill_user
+        ON skills.id = skill_user.skill_id
         WHERE skill_user.user_id =  ?; ";
 
         $stmt = $conn->prepare($sql);
@@ -376,12 +376,23 @@ class User {
         return $skills;
     }
 
+    public function getPredefinedSkills() {
+        $conn = $this->db->getConnection();
+        $sql = "SELECT skill_name FROM predefined_skills ORDER BY skill_name";
+        $result = $conn->query($sql);
+        $skills = [];
+        while ($row = $result->fetch_assoc()) {
+            $skills[] = $row['skill_name'];
+        }
+        return $skills;
+    }
+
     public function getHobbies($user_id) {
         $conn = $this->db->getConnection();
-        $sql = "SELECT hobbies.hobby_name 
-        FROM `hobbies` 
-        JOIN hobby_user 
-        ON hobbies.id = hobby_user.hobby_id 
+        $sql = "SELECT hobbies.hobby_name
+        FROM `hobbies`
+        JOIN hobby_user
+        ON hobbies.id = hobby_user.hobby_id
         WHERE hobby_user.user_id =  ?; ";
 
         $stmt = $conn->prepare($sql);
@@ -393,6 +404,219 @@ class User {
             $hobbies[] = $row['hobby_name'];
         }
         return $hobbies;
+    }
+
+    public function getPredefinedHobbies() {
+        $conn = $this->db->getConnection();
+        $sql = "SELECT hobby_name FROM predefined_hobbies ORDER BY hobby_name";
+        $result = $conn->query($sql);
+        $hobbies = [];
+        while ($row = $result->fetch_assoc()) {
+            $hobbies[] = $row['hobby_name'];
+        }
+        return $hobbies;
+    }
+
+    // Get all skills from database (not predefined)
+    public function getAllSkills() {
+        $conn = $this->db->getConnection();
+        $sql = "SELECT id, skill_name FROM skills ORDER BY skill_name";
+        $result = $conn->query($sql);
+        $skills = [];
+        while ($row = $result->fetch_assoc()) {
+            $skills[] = $row;
+        }
+        return $skills;
+    }
+
+    // Get skills with pagination
+    public function getSkillsPaginated($page = 1, $limit = 10, $sort_column = 'skill_name', $sort_order = 'ASC') {
+        $conn = $this->db->getConnection();
+        $offset = ($page - 1) * $limit;
+        $allowed_columns = ['id', 'skill_name'];
+        $allowed_orders = ['ASC', 'DESC'];
+        if (!in_array($sort_column, $allowed_columns)) $sort_column = 'skill_name';
+        if (!in_array($sort_order, $allowed_orders)) $sort_order = 'ASC';
+        $sql = "SELECT id, skill_name FROM skills ORDER BY $sort_column $sort_order LIMIT ? OFFSET ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $limit, $offset);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $skills = [];
+        while ($row = $result->fetch_assoc()) {
+            $skills[] = $row;
+        }
+        return $skills;
+    }
+
+    // Get total number of skills
+    public function getTotalSkills() {
+        $conn = $this->db->getConnection();
+        $sql = "SELECT COUNT(*) as total FROM skills";
+        $result = $conn->query($sql);
+        $row = $result->fetch_assoc();
+        return $row['total'];
+    }
+
+    // Get all hobbies from database (not predefined)
+    public function getAllHobbies() {
+        $conn = $this->db->getConnection();
+        $sql = "SELECT id, hobby_name FROM hobbies ORDER BY hobby_name";
+        $result = $conn->query($sql);
+        $hobbies = [];
+        while ($row = $result->fetch_assoc()) {
+            $hobbies[] = $row;
+        }
+        return $hobbies;
+    }
+
+    // Get hobbies with pagination
+    public function getHobbiesPaginated($page = 1, $limit = 10, $sort_column = 'hobby_name', $sort_order = 'ASC') {
+        $conn = $this->db->getConnection();
+        $offset = ($page - 1) * $limit;
+        $allowed_columns = ['id', 'hobby_name'];
+        $allowed_orders = ['ASC', 'DESC'];
+        if (!in_array($sort_column, $allowed_columns)) $sort_column = 'hobby_name';
+        if (!in_array($sort_order, $allowed_orders)) $sort_order = 'ASC';
+        $sql = "SELECT id, hobby_name FROM hobbies ORDER BY $sort_column $sort_order LIMIT ? OFFSET ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("ii", $limit, $offset);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $hobbies = [];
+        while ($row = $result->fetch_assoc()) {
+            $hobbies[] = $row;
+        }
+        return $hobbies;
+    }
+
+    // Get total number of hobbies
+    public function getTotalHobbies() {
+        $conn = $this->db->getConnection();
+        $sql = "SELECT COUNT(*) as total FROM hobbies";
+        $result = $conn->query($sql);
+        $row = $result->fetch_assoc();
+        return $row['total'];
+    }
+
+    // Update skill name globally
+    public function updateSkillName($skill_id, $new_name) {
+        try {
+            $conn = $this->db->getConnection();
+            $sql = "UPDATE skills SET skill_name = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("si", $new_name, $skill_id);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log("Error updating skill name: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Update hobby name globally
+    public function updateHobbyName($hobby_id, $new_name) {
+        try {
+            $conn = $this->db->getConnection();
+            $sql = "UPDATE hobbies SET hobby_name = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("si", $new_name, $hobby_id);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log("Error updating hobby name: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Delete skill globally (removes from all users)
+    public function deleteSkill($skill_id) {
+        try {
+            $conn = $this->db->getConnection();
+            // Start transaction
+            $conn->begin_transaction();
+
+            // Delete from pivot table first
+            $sql1 = "DELETE FROM skill_user WHERE skill_id = ?";
+            $stmt1 = $conn->prepare($sql1);
+            $stmt1->bind_param("i", $skill_id);
+            $stmt1->execute();
+
+            // Delete from skills table
+            $sql2 = "DELETE FROM skills WHERE id = ?";
+            $stmt2 = $conn->prepare($sql2);
+            $stmt2->bind_param("i", $skill_id);
+            $stmt2->execute();
+
+            $conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $conn->rollback();
+            error_log("Error deleting skill: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Delete hobby globally (removes from all users)
+    public function deleteHobby($hobby_id) {
+        try {
+            $conn = $this->db->getConnection();
+            // Start transaction
+            $conn->begin_transaction();
+
+            // Delete from pivot table first
+            $sql1 = "DELETE FROM hobby_user WHERE hobby_id = ?";
+            $stmt1 = $conn->prepare($sql1);
+            $stmt1->bind_param("i", $hobby_id);
+            $stmt1->execute();
+
+            // Delete from hobbies table
+            $sql2 = "DELETE FROM hobbies WHERE id = ?";
+            $stmt2 = $conn->prepare($sql2);
+            $stmt2->bind_param("i", $hobby_id);
+            $stmt2->execute();
+
+            $conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $conn->rollback();
+            error_log("Error deleting hobby: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Add new skill
+    public function addSkill($skill_name) {
+        try {
+            $conn = $this->db->getConnection();
+            $sql = "INSERT INTO skills (skill_name) VALUES (?)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("s", $skill_name);
+            if ($stmt->execute()) {
+                return $conn->insert_id;
+            } else {
+                return false;
+            }
+        } catch (Exception $e) {
+            error_log("Error adding skill: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Add new hobby
+    public function addHobby($hobby_name) {
+        try {
+            $conn = $this->db->getConnection();
+            $sql = "INSERT INTO hobbies (hobby_name) VALUES (?)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param("s", $hobby_name);
+            if ($stmt->execute()) {
+                return $conn->insert_id;
+            } else {
+                return false;
+            }
+        } catch (Exception $e) {
+            error_log("Error adding hobby: " . $e->getMessage());
+            return false;
+        }
     }
 
     public function getProjects($user_id) {
@@ -640,28 +864,51 @@ class Admin extends User {
         return $users;
     }
 
-    public function createUser($username, $password, $email) {
+    public function getUsersPaginated($page = 1, $limit = 10) {
         $conn = $this->db->getConnection();
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $sql = "INSERT INTO users (username, password, email) VALUES (?, ?, ?)";
+        $offset = ($page - 1) * $limit;
+        $sql = "SELECT * FROM users WHERE deleted_at IS NULL ORDER BY id LIMIT ? OFFSET ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("sss", $username, $hashed_password, $email);
-        return $stmt->execute();
+        $stmt->bind_param("ii", $limit, $offset);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $users = [];
+        while ($row = $result->fetch_assoc()) {
+            $users[] = $row;
+        }
+        return $users;
     }
 
-    public function updateUser($id, $username, $email) {
+    public function getTotalUsers() {
         $conn = $this->db->getConnection();
-        $sql = "UPDATE users SET username = ?, email = ? WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssi", $username, $email, $id);
-        return $stmt->execute();
+        $sql = "SELECT COUNT(*) as total FROM users WHERE deleted_at IS NULL";
+        $result = $conn->query($sql);
+        $row = $result->fetch_assoc();
+        return $row['total'];
     }
 
-    public function deleteUser($id) {
-        $conn = $this->db->getConnection();
-        $sql = "UPDATE users SET deleted_at = NOW() WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param("i", $id);
-        return $stmt->execute();
-    }
+    // public function createUser($username, $password, $email) {
+    //     $conn = $this->db->getConnection();
+    //     $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+    //     $sql = "INSERT INTO users (username, password, email) VALUES (?, ?, ?)";
+    //     $stmt = $conn->prepare($sql);
+    //     $stmt->bind_param("sss", $username, $hashed_password, $email);
+    //     return $stmt->execute();
+    // }
+
+    // public function updateUser($id, $username, $email) {
+    //     $conn = $this->db->getConnection();
+    //     $sql = "UPDATE users SET username = ?, email = ? WHERE id = ?";
+    //     $stmt = $conn->prepare($sql);
+    //     $stmt->bind_param("ssi", $username, $email, $id);
+    //     return $stmt->execute();
+    // }
+
+    // public function deleteUser($id) {
+    //     $conn = $this->db->getConnection();
+    //     $sql = "UPDATE users SET deleted_at = NOW() WHERE id = ?";
+    //     $stmt = $conn->prepare($sql);
+    //     $stmt->bind_param("i", $id);
+    //     return $stmt->execute();
+    // }
 }

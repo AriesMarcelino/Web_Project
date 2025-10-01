@@ -17,6 +17,10 @@ include "classes.php";
 $userObj = new User();
 $current_user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
 
+// Fetch predefined skills and hobbies
+$predefined_skills = $userObj->getPredefinedSkills();
+$predefined_hobbies = $userObj->getPredefinedHobbies();
+
 // Handle profile update POST request
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile']) && $current_user_id) {
     if ($current_user_id != $_POST['user_id']) {
@@ -520,24 +524,6 @@ if ($current_user_id && $current_user_id != $user['id']) {
                             <div class="skills-select-wrapper">
                                 <select id="skills-select" name="skills[]" multiple="multiple" class="skills-select">
                                     <?php
-                                    // Predefined skills options
-                                    $predefined_skills = [
-                                        'JavaScript', 'Python', 'Java', 'PHP', 'HTML', 'CSS', 'React', 'Vue.js', 'Angular',
-                                        'Node.js', 'Express.js', 'Django', 'Laravel', 'Spring Boot', 'MySQL', 'PostgreSQL',
-                                        'MongoDB', 'Git', 'Docker', 'AWS', 'Azure', 'Linux', 'Machine Learning', 'Data Science',
-                                        'UI/UX Design', 'Graphic Design', 'Photography', 'Video Editing', 'Content Writing',
-                                        'SEO', 'Digital Marketing', 'Project Management', 'Agile', 'Scrum', 'Leadership',
-                                        'Communication', 'Problem Solving', 'Critical Thinking', 'Teamwork', 'Time Management'
-                                    ];
-
-                                    // Predefined hobbies options
-                                    $predefined_hobbies = [
-                                        'Reading', 'Traveling', 'Cooking', 'Sports', 'Music', 'Gaming', 'Photography',
-                                        'Writing', 'Gardening', 'Painting', 'Dancing', 'Hiking', 'Swimming', 'Cycling',
-                                        'Yoga', 'Meditation', 'Chess', 'Board Games', 'Collecting', 'Volunteering',
-                                        'Learning Languages', 'Coding', 'Blogging', 'Podcasting', 'Filmmaking', 'Sculpting'
-                                    ];
-
                                     // Get current user's skills
                                     $current_skills = array_map('trim', $skills);
 

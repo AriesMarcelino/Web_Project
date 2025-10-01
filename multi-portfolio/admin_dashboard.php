@@ -3,7 +3,6 @@
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
-
 // Include database connection
 include "db.php";
 
@@ -24,160 +23,78 @@ if (!isset($_SESSION['admin_id'])) {
     }
 }
 
-// Handle POST requests (AJAX operations)
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Handle user creation
-    if (isset($_POST['create'])) {
-        $username = $conn->real_escape_string($_POST['username']);
-        $password = password_hash($_POST['password'], PASSWORD_DEFAULT); // Hash the password
-        $email = $conn->real_escape_string($_POST['email']);
-        
-        try {
-            $sql = "INSERT INTO users (username, password, email) VALUES ('$username', '$password', '$email')";
-            if ($conn->query($sql)) {
-                $user_id = $conn->insert_id;
-                // Fetch the newly created user data
-                $result = $conn->query("SELECT id, username, email FROM users WHERE id=$user_id");
-                $user = $result->fetch_assoc();
-                header('Content-Type: application/json');
-                echo json_encode([
-                    'success' => true,
-                    'user_id' => $user['id'],
-                    'username' => $user['username'],
-                    'email' => $user['email']
-                ]);
-            } else {
-                throw new Exception($conn->error);
-            }
-        } catch (mysqli_sql_exception $e) {
-            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
-                header('Content-Type: application/json');
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Username or email already exists. Please choose a different one.'
-                ]);
-            } else {
-                header('Content-Type: application/json');
-                echo json_encode([
-                    'success' => false,
-                    'message' => 'Error creating user: ' . $e->getMessage()
-                ]);
-            }
-        }
-        exit();
-        }
-
-    // Handle user update
-    elseif (isset($_POST['update'])) {
-        $id = (int)$_POST['id'];
-        $username = $conn->real_escape_string($_POST['username']);
-        $email = $conn->real_escape_string($_POST['email']);
-        $sql = "UPDATE users SET username='$username', email='$email' WHERE id=$id";
-        $success = $conn->query($sql);
-        if (!$success) {
-            error_log("Update failed: " . $conn->error);
-        }
-        header('Content-Type: application/json');
-        if ($success) {
-            // Fetch updated user data
-            $result = $conn->query("SELECT id, username, email FROM users WHERE id=$id");
-            $user = $result->fetch_assoc();
-            echo json_encode([
-                'success' => true,
-                'user' => $user
-            ]);
-        } else {
-            echo json_encode([
-                'success' => false,
-                'message' => 'Error updating user: ' . $conn->error
-            ]);
-        }
-        exit();
+// Handle AJAX request for chart data
+$isAjax = isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+if ($isAjax && isset($_GET['action']) && $_GET['action'] === 'get_chart_data') {
+    // Fetch top 5 most common skills
+    $skills_sql = "SELECT skills.skill_name, COUNT(skill_user.user_id) as count
+                   FROM skills
+                   JOIN skill_user ON skills.id = skill_user.skill_id
+                   GROUP BY skills.id, skills.skill_name
+                   ORDER BY count DESC
+                   LIMIT 5";
+    $skills_result = $conn->query($skills_sql);
+    $top_skills = [];
+    while ($row = $skills_result->fetch_assoc()) {
+        $top_skills[] = $row;
     }
 
-    // Handle user deletion
-    elseif (isset($_POST['delete'])) {
-        $id = (int)$_POST['id'];
-        // Validate user ID
-        if ($id <= 0) {
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => false,
-                'message' => 'Invalid user ID'
-            ]);
-            exit();
-        }
-        // Check if user exists before deletion
-        $check_sql = "SELECT id, username FROM users WHERE id = ? AND deleted_at IS NULL";
-        $check_stmt = $conn->prepare($check_sql);
-        $check_stmt->bind_param("i", $id);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        if ($check_result->num_rows === 0) {
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => false,
-                'message' => 'User not found or already deleted'
-            ]);
-            exit();
-        }
-        $user = $check_result->fetch_assoc();
-        // Start transaction for data integrity
-        $conn->begin_transaction();
-        try {
-            // Delete from pivot tables first (to avoid foreign key constraint issues)
-            $pivot_tables = [
-                'skill_user',
-                'hobby_user',
-                'project_user',
-                'award_user',
-                'certificate_user',
-                'social_media_user',
-            ];
-            foreach ($pivot_tables as $table) {
-                $delete_sql = "DELETE FROM $table WHERE user_id = ?";
-                $delete_stmt = $conn->prepare($delete_sql);
-                $delete_stmt->bind_param("i", $id);
-                $delete_stmt->execute();
-            }
-            // Finally, mark user as deleted
-            $sql = "UPDATE users SET deleted_at = NOW() WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            $stmt->bind_param("i", $id);
-
-            if ($stmt->execute() && $stmt->affected_rows > 0) {
-                $conn->commit();
-                error_log("User deleted successfully: ID $id, Username: " . $user['username']);
-                header('Content-Type: application/json');
-                echo json_encode([
-                    'success' => true,
-                    'message' => 'User deleted successfully'
-                ]);
-                exit();
-            } else {
-                throw new Exception("Failed to delete user");
-            }
-
-        } catch (Exception $e) {
-            $conn->rollback();
-            error_log("Error deleting user $id: " . $e->getMessage());
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => false,
-                'message' => 'Error deleting user: ' . $e->getMessage()
-            ]);
-            exit();
-        }
+    // Fetch top 5 most common hobbies
+    $hobbies_sql = "SELECT hobbies.hobby_name, COUNT(hobby_user.user_id) as count
+                    FROM hobbies
+                    JOIN hobby_user ON hobbies.id = hobby_user.hobby_id
+                    GROUP BY hobbies.id, hobbies.hobby_name
+                    ORDER BY count DESC
+                    LIMIT 5";
+    $hobbies_result = $conn->query($hobbies_sql);
+    $top_hobbies = [];
+    while ($row = $hobbies_result->fetch_assoc()) {
+        $top_hobbies[] = $row;
     }
+
+    // Return data as JSON
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => true,
+        'skills' => $top_skills,
+        'hobbies' => $top_hobbies
+    ]);
+    exit();
 }
 
-// Fetch users for display
-$sql = "SELECT * FROM users WHERE deleted_at IS NULL ORDER BY id";
-$result = $conn->query($sql);
-$users = [];
-while ($row = $result->fetch_assoc()) {
-    $users[] = $row;
-}
+    // Fetch users for display
+    $sql = "SELECT * FROM users WHERE deleted_at IS NULL ORDER BY id";
+    $result = $conn->query($sql);
+    $users = [];
+    while ($row = $result->fetch_assoc()) {
+        $users[] = $row;
+    }
+
+        // // Fetch top 5 most common skills
+        // $skills_sql = "SELECT skills.skill_name, COUNT(skill_user.user_id) as count
+        //             FROM skills
+        //             JOIN skill_user ON skills.id = skill_user.skill_id
+        //             GROUP BY skills.id, skills.skill_name
+        //             ORDER BY count DESC
+        //             LIMIT 5";
+        // $skills_result = $conn->query($skills_sql);
+        // $top_skills = [];
+        // while ($row = $skills_result->fetch_assoc()) {
+        //     $top_skills[] = $row;
+        // }
+
+        // // Fetch top 5 most common hobbies
+        // $hobbies_sql = "SELECT hobbies.hobby_name, COUNT(hobby_user.user_id) as count
+        //                 FROM hobbies
+        //                 JOIN hobby_user ON hobbies.id = hobby_user.hobby_id
+        //                 GROUP BY hobbies.id, hobbies.hobby_name
+        //                 ORDER BY count DESC
+        //                 LIMIT 5";
+        // $hobbies_result = $conn->query($hobbies_sql);
+        // $top_hobbies = [];
+        // while ($row = $hobbies_result->fetch_assoc()) {
+        //     $top_hobbies[] = $row;
+        // }
 ?>
 <!DOCTYPE html>
 <html>
@@ -185,6 +102,7 @@ while ($row = $result->fetch_assoc()) {
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="admin.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .loading {
             display: none;
@@ -198,42 +116,48 @@ while ($row = $result->fetch_assoc()) {
             border-radius: 5px;
             z-index: 1000;
         }
-        .success-message, .error-message {
-            padding: 10px;
-            margin: 10px 0;
+        .charts-wrapper {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .chart-container {
+            flex: 1;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 48%;
+        }
+        .chart-container h3 {
+            margin-bottom: 20px;
+            color: #333;
+            text-align: center;
+        }
+        #skillsChart, #hobbiesChart {
+            max-width: 100%;
+            height: auto !important;
+        }
+        .sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .nav-link {
+            display: block;
+            padding: 10px 15px;
+            text-decoration: none;
+            color: #333;
             border-radius: 4px;
-            display: none;
+            transition: background-color 0.3s ease;
         }
-        .success-message {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .nav-link:hover {
+            background-color: #f0f0f0;
         }
-        .error-message {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .user-form input {
-            margin: 5px 0;
-            padding: 8px;
-            width: 200px;
-        }
-        .user-form button {
-            margin: 5px;
-            padding: 8px 15px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .user-form button:hover {
-            background: #0056b3;
-        }
-        .user-form button:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
+        .nav-link.active {
+            background-color: #e0e0e0;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -242,16 +166,17 @@ while ($row = $result->fetch_assoc()) {
         <div>Processing...</div>
     </div>
     <header>
-        <button class="menu-toggle">☰</button>
         <h1>Admin Dashboard</h1>
         <a href="logout.php" class="logout-btn">Logout</a>
     </header>
     <aside class="sidebar">
-        <ul>
-            <li><a href="admin_dashboard.php">Dashboard</a></li>
-            <li><a href="admin_users.php">Users</a></li>
-            <li><a href="admin_settings.php">Settings</a></li>
-        </ul>
+        <nav class="sidebar-nav">
+            <a href="admin_dashboard.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'admin_dashboard.php' ? 'active' : ''; ?>">Dashboard</a>
+            <a href="admin_user_management.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'admin_user_management.php' ? 'active' : ''; ?>">User Management</a>
+            <a href="admin_skills.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'admin_skills.php' ? 'active' : ''; ?>">Skills Management</a>
+            <a href="admin_hobbies.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'admin_hobbies.php' ? 'active' : ''; ?>">Hobbies Management</a>
+            <a href="admin_manage_users.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'admin_manage_users.php' ? 'active' : ''; ?>">Per-User Skills & Hobbies</a>
+        </nav>
     </aside>
 
     <main class="main-content">
@@ -266,244 +191,126 @@ while ($row = $result->fetch_assoc()) {
                 <h3>Active Users</h3>
                 <p><?php echo count(array_filter($users, function($u) { return $u['is_admin'] == 0; })); ?></p>
             </div>
-            <div class="card">
-                <h3>Admins</h3>
-                <p><?php echo count(array_filter($users, function($u) { return $u['is_admin'] == 1; })); ?></p>
+        </div>
+
+        <div class="charts-wrapper">
+            <div class="chart-container">
+                <h3>Top 5 Most Common Skills</h3>
+                <canvas id="skillsChart" width="400" height="200"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3>Top 5 Most Common Hobbies</h3>
+                <canvas id="hobbiesChart" width="400" height="200"></canvas>
             </div>
         </div>
 
-        <div id="message-container"></div>
 
-        <h3>Create User</h3>
-        <form class="user-form" id="create-user-form">
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
-            <input type="email" name="email" placeholder="Email">
-            <button type="submit" id="create-btn">Create</button>
-        </form>
-
-        <h3>Users</h3>
-        <table id="users-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($users as $user): ?>
-                <tr data-user-id="<?php echo $user['id']; ?>">
-                    <td><?php echo $user['id']; ?></td>
-                    <td><?php echo $user['username']; ?></td>
-                    <td><?php echo $user['email']; ?></td>
-                    <td>
-                        <form class="user-form update-form" data-user-id="<?php echo $user['id']; ?>">
-                            <input type="hidden" name="id" value="<?php echo $user['id']; ?>">
-                            <input type="text" name="username" value="<?php echo $user['username']; ?>" required>
-                            <input type="email" name="email" value="<?php echo $user['email']; ?>">
-                            <button type="submit" class="update-btn">Update</button>
-                        </form>
-                        <button class="delete-btn" data-user-id="<?php echo $user['id']; ?>">Delete</button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
     </main>
 
     <script>
         $(document).ready(function() {
-            // Sidebar toggle functionality
-            $('.menu-toggle').click(function() {
-                $('.sidebar').toggleClass('collapsed');
-                $('.main-content').toggleClass('expanded');
-            });
-            // Set active menu item
-            const currentPage = window.location.pathname.split('/').pop();
-            $('.sidebar a').each(function() {
-                if ($(this).attr('href') === currentPage) {
-                    $(this).parent().addClass('active');
-                }
-            });
-            // Show loading spinner
-            function showLoading() {
-                $('#loading').show();
-            }
-            // Hide loading spinner
-            function hideLoading() {
-                $('#loading').hide();
-            }
-            // Show message
-            function showMessage(message, type = 'success') {
-                const messageDiv = $('<div>')
-                    .addClass(type + '-message')
-                    .text(message)
-                    .hide();
-                $('#message-container').html(messageDiv);
-                messageDiv.fadeIn();
+            // Chart.js bar chart for top skills and hobbies using AJAX
+            const skillsCtx = document.getElementById('skillsChart').getContext('2d');
+            const hobbiesCtx = document.getElementById('hobbiesChart').getContext('2d');
 
-                setTimeout(function() {
-                    messageDiv.fadeOut();
-                }, 3000);
-            }
-            // Create user AJAX
-            $('#create-user-form').on('submit', function(e) {
-                e.preventDefault();
-                const formData = $(this).serialize();
-                const createBtn = $('#create-btn');
-                const originalText = createBtn.text();
-                createBtn.text('Creating...').prop('disabled', true);
-                showLoading();
+            let skillsChart;
+            let hobbiesChart;
+
+            function fetchChartData() {
                 $.ajax({
                     url: 'admin_dashboard.php',
-                    type: 'POST',
-                    data: formData + '&create=1',
+                    method: 'GET',
+                    data: { action: 'get_chart_data' },
+                    dataType: 'json',
                     success: function(response) {
-                        hideLoading();
-                        createBtn.text(originalText).prop('disabled', false);
                         if (response.success) {
-                            showMessage('User created successfully!');
-                            $('#create-user-form')[0].reset();
-                            // Add new user to table
-                            const newRow = `
-                                <tr data-user-id="${response.user_id}">
-                                    <td>${response.user_id}</td>
-                                    <td>${response.username}</td>
-                                    <td>${response.email}</td>
-                                    <td>
-                                        <form class="user-form update-form" data-user-id="${response.user_id}">
-                                            <input type="hidden" name="id" value="${response.user_id}">
-                                            <input type="text" name="username" value="${response.username}" required>
-                                            <input type="email" name="email" value="${response.email}">
-                                            <button type="submit" class="update-btn">Update</button>
-                                        </form>
-                                        <button class="delete-btn" data-user-id="${response.user_id}">Delete</button>
-                                    </td>
-                                </tr>
-                            `;
-                            $('#users-table tbody').append(newRow);
-                            // Update dashboard cards
-                            updateDashboardCards();
-                        } else {
-                            showMessage(response.message || 'Error creating user', 'error');
-                        }
-                    },
-                    error: function() {
-                        hideLoading();
-                        createBtn.text(originalText).prop('disabled', false);
-                        showMessage('Error creating user', 'error');
-                    }
-                });
-            });
-            // Update user AJAX
-            $(document).on('submit', '.update-form', function(e) {
-                e.preventDefault();
-                const form = $(this);
-                const formData = form.serialize();
-                const updateBtn = form.find('.update-btn');
-                const originalText = updateBtn.text();
-                const userId = form.data('user-id');
-                updateBtn.text('Updating...').prop('disabled', true);
-                showLoading();
-                $.ajax({
-                    url: 'admin_dashboard.php',
-                    type: 'POST',
-                    data: formData + '&update=1',
-                    dataType:'json',
-                    success: function(response) {
-                        hideLoading();
-                        updateBtn.text(originalText).prop('disabled', false);
-                        if (response.success) {
-                            showMessage('User updated successfully!');
-                            // Update the table row
-                            const row = form.closest('tr');
-                            const newData = response.user;
-                            row.find('td:nth-child(2)').text(newData.username);
-                            row.find('td:nth-child(3)').text(newData.email);
-                            form.find('input[name="username"]').val(newData.username);
-                            form.find('input[name="email"]').val(newData.email);
-                        } else {
-                            showMessage(response.message || 'Error updating user', 'error');
-                        }
-                    },
-                    error: function() {
-                        hideLoading();
-                        updateBtn.text(originalText).prop('disabled', false);
-                        showMessage('Error updating user', 'error');
-                    }
-                });
-            });
-            // Delete user AJAX
-            $(document).on('click', '.delete-btn', function() {
-                const userId = $(this).data('user-id');
-                const row = $(this).closest('tr');
-                if (confirm('Are you sure you want to delete this user?')) {
-                    const deleteBtn = $(this);
-                    const originalText = deleteBtn.text();
-                    deleteBtn.text('Deleting...').prop('disabled', true);
-                    showLoading();
-                    $.ajax({
-                        url: 'admin_dashboard.php',
-                        type: 'POST',
-                        data: { id: userId, delete: 1 },
-                        dataType:'json',
-                        success: function(response) {
-                            hideLoading();
-                            deleteBtn.text(originalText).prop('disabled', false);
-                            if (response.success) {
-                                showMessage('User deleted successfully!');
-                                 row.fadeOut(function() {
-                                    $(this).remove();
-                                    updateDashboardCards();
-                                });
-                            } else {
-                                showMessage(response.message || 'Error deleting user', 'error');
+                            const skillLabels = response.skills.map(skill => skill.skill_name);
+                            const skillData = response.skills.map(skill => skill.count);
+                            const skillColors = ['rgba(54, 162, 235, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)', 'rgba(255, 99, 132, 0.6)'];
+                            const skillBorderColors = ['rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)', 'rgba(255, 99, 132, 1)'];
+
+                            const hobbyLabels = response.hobbies.map(hobby => hobby.hobby_name);
+                            const hobbyData = response.hobbies.map(hobby => hobby.count);
+                            const hobbyColors = ['rgba(255, 206, 86, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)', 'rgba(255, 159, 64, 0.6)'];
+                            const hobbyBorderColors = ['rgba(255, 206, 86, 1)', 'rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)', 'rgba(255, 159, 64, 1)'];
+
+                            if (skillsChart) {
+                                skillsChart.destroy();
                             }
-                        },
-                        error: function() {
-                            hideLoading();
-                            deleteBtn.text(originalText).prop('disabled', false);
-                            showMessage('Error deleting user', 'error');
-                        }
-                    });
-                }
-            });
-            // Update dashboard cards
-            function updateDashboardCards() {
-                const totalUsers = $('#users-table tbody tr').length;
-                const activeUsers = $('#users-table tbody tr').filter(function() {
-                    return $(this).find('td:nth-child(2)').text().indexOf('admin') === -1;
-                }).length;
-                const admins = totalUsers - activeUsers;
-                $('.card:nth-child(1) p').text(totalUsers);
-                $('.card:nth-child(2) p').text(activeUsers);
-                $('.card:nth-child(3) p').text(admins);
-            }
-            // Form validation
-            function validateForm(form) {
-                const inputs = form.find('input[required]');
-                let isValid = true;
+                            if (hobbiesChart) {
+                                hobbiesChart.destroy();
+                            }
 
-                inputs.each(function() {
-                    if ($(this).val().trim() === '') {
-                        isValid = false;
-                        $(this).addClass('error');
-                    } else {
-                        $(this).removeClass('error');
+                            skillsChart = new Chart(skillsCtx, {
+                                type: 'bar',
+                                data: {
+                                    labels: skillLabels,
+                                    datasets: [{
+                                        label: 'Count',
+                                        data: skillData,
+                                        backgroundColor: skillColors,
+                                        borderColor: skillBorderColors,
+                                        borderWidth: 2
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                stepSize: 1
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        }
+                                    }
+                                }
+                            });
+
+                            hobbiesChart = new Chart(hobbiesCtx, {
+                                type: 'bar',
+                                data: {
+                                    labels: hobbyLabels,
+                                    datasets: [{
+                                        label: 'Count',
+                                        data: hobbyData,
+                                        backgroundColor: hobbyColors,
+                                        borderColor: hobbyBorderColors,
+                                        borderWidth: 2
+                                    }]
+                                },
+                                options: {
+                                    responsive: true,
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            ticks: {
+                                                stepSize: 1
+                                            }
+                                        }
+                                    },
+                                    plugins: {
+                                        legend: {
+                                            display: false
+                                        }
+                                    }
+                                }
+                            });
+                        } else {
+                            alert('Failed to load chart data: ' + response.message);
+                        }
+                    },
+                    error: function() {
+                        alert('Error fetching chart data.');
                     }
                 });
-                return isValid;
             }
-            // Add CSS for error inputs
-            const style = $('<style>').text(`
-                input.error {
-                    border-color: #dc3545;
-                    background-color: #f8d7da;
-                }
-            `);
-            $('head').append(style);
+
+            fetchChartData();
         });
     </script>
 </body>
