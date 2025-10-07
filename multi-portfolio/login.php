@@ -72,27 +72,37 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <html>
 <head>
     <title>Login</title>
-    <link rel="stylesheet" href="login.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 </head>
-<body>
-     <div class="login-image">
-        <img src="uploads/login.png" alt="Login Icon">
+<body class="bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 hover:scale-105">
+        <div class="text-center mb-6">
+            <img src="uploads/login.png" alt="Login Icon" class="w-20 h-20 mx-auto mb-4 rounded-full shadow-lg">
+            <h2 class="text-2xl font-bold text-gray-800">Welcome Back!</h2>
+            <br>
+            <p class="text-gray-600">Sign in to your account</p>
+        </div>
+
+        <?php if (isset($error)) echo "<p class='text-red-500 text-center mb-4 bg-red-100 p-3 rounded-lg'>$error</p>"; ?>
+
+        <form method="post" class="space-y-4">
+            <div>
+                <input type="text" name="username" placeholder="Username" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
+            </div>
+
+            <div class="relative">
+                <input type="password" name="password" placeholder="Password" required class="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 password-field">
+                <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 password-toggle">
+                    👁
+                </button>
+            </div>
+
+            <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                Login
+            </button>
+        </form>
     </div>
-
-    <?php if (isset($error)) echo "<p style='color:red;'>$error</p>"; ?>
-
-    <form method="post">
-        <input type="text" name="username" placeholder="Username" required><br>
-        
-<div class="password-container">
-  <input type="password" name="password" placeholder="Password" required class="password-field">
-  
-</div>
-
-        <input type="submit" value="Login">
-
-    </form>
 
     <script>
         $(document).ready(function() {
@@ -165,15 +175,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $('.success-message').remove();
 
                     // Add error message
-                    var errorDiv = $('<div class="error-message"></div>')
+                    var errorDiv = $('<div class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50"></div>')
                         .text(message)
                         .hide()
-                        .prependTo('body')
-                        .slideDown(300);
+                        .appendTo('body')
+                        .fadeIn(300);
 
                     // Remove error after 5 seconds
                     setTimeout(function() {
-                        errorDiv.slideUp(300, function() {
+                        errorDiv.fadeOut(300, function() {
                             $(this).remove();
                         });
                     }, 5000);
@@ -185,11 +195,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $('.success-message').remove();
 
                     // Add success message
-                    var successDiv = $('<div class="success-message"></div>')
+                    var successDiv = $('<div class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50"></div>')
                         .text(message)
                         .hide()
-                        .prependTo('body')
-                        .slideDown(300);
+                        .appendTo('body')
+                        .fadeIn(300);
                 }
             });
 
@@ -224,61 +234,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 }
             });
 
-            // Enhanced form interactions
-            $('input').on('focus', function() {
-                $(this).parent().addClass('focused');
-            }).on('blur', function() {
-                if (!$(this).val().trim()) {
-                    $(this).parent().removeClass('focused');
+            // Password toggle
+            $('.password-toggle').click(function(e) {
+                e.preventDefault();
+                var passwordField = $('input[name="password"]');
+                if (passwordField.attr('type') === 'password') {
+                    passwordField.attr('type', 'text');
+                    $(this).attr('title', 'Hide Password');
+                } else {
+                    passwordField.attr('type', 'password');
+                    $(this).attr('title', 'Show Password');
                 }
             });
-
-            
-        var passwordField = $('input[name="password"]');
-        var passwordContainer = $('.password-container');
-        var toggleBtn = $('<button type="button" class="password-toggle" title="Show Password">👁</button>'); // UNCOMMENTED
-
-        passwordField.css({
-            'padding-right': '40px', 
-            'width': '75%',
-            'box-sizing': 'border-box'
-        });
-
-        passwordContainer.css({
-            'position': 'relative',
-            'display': 'inline-block',
-            'width': '100%'
-        });
-
-        toggleBtn.css({
-            'position': 'absolute',
-            'right': '40px',
-            'top': '50%',
-            'transform': 'translateY(-50%)',
-            'background': 'none',
-            'border': 'none',
-            'cursor': 'pointer',
-            'font-size': '16px',
-            'z-index': '10',
-            'color': '#666',
-            'padding': '0',
-            'height': '24px',
-            'width': '24px',
-            'line-height': '24px'
-        });
-
-        passwordContainer.append(toggleBtn);
-
-        toggleBtn.click(function(e) {
-            e.preventDefault(); // Prevent form submission
-            if (passwordField.attr('type') === 'password') {
-                passwordField.attr('type', 'text');
-                $(this).attr('title', 'Hide Password').text('👁');
-            } else {
-                passwordField.attr('type', 'password');
-                $(this).attr('title', 'Show Password').text('👁');
-            }
-        });
             // Keyboard shortcuts
             $(document).on('keydown', function(e) {
                 // Enter key submits form

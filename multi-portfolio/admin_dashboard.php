@@ -101,6 +101,7 @@ if ($isAjax && isset($_GET['action']) && $_GET['action'] === 'get_chart_data') {
 <head>
     <title>Admin Dashboard</title>
     <link rel="stylesheet" href="admin.css">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
