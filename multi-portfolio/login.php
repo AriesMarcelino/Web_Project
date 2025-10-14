@@ -74,34 +74,55 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <title>Login</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- <style>
+        @keyframes gradientShift {
+            0% { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+            25% { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+            50% { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+            75% { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+            100% { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        }
+        #login-body {
+            animation: gradientShift 10s ease infinite;
+            background-size: 400% 400%;
+        }
+    </style> -->
 </head>
-<body class="bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500 min-h-screen flex items-center justify-center p-4">
-    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md transform transition-all duration-300 hover:scale-105">
-        <div class="text-center mb-6">
-            <img src="uploads/login.png" alt="Login Icon" class="w-20 h-20 mx-auto mb-4 rounded-full shadow-lg">
-            <h2 class="text-2xl font-bold text-gray-800">Welcome Back!</h2>
-            <br>
-            <p class="text-gray-600">Sign in to your account</p>
+<body class="bg-gradient-to-br from-blue-500 via-purple-400 to-pink-400 min-h-screen flex flex-col md:flex-row">
+    <!-- Left half: Welcome/Branding -->
+    <div class="md:w-1/2 flex flex-col justify-center items-center p-8 bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+        <img src="uploads/login.png" alt="Login Icon" class="w-24 h-24 mb-6 rounded-full shadow-lg">
+        <h1 class="text-3xl font-bold mb-4 text-center">Welcome!</h1>
+        <p class="text-lg text-center mb-6">Sign in to access your personalized portfolio and showcase your skills, hobbies, and achievements.</p>
+        <div class="text-center">
+            <p class="text-sm opacity-90">Don't have an account? <a href="signup.php" class="underline hover:opacity-80">Sign up here</a></p>
         </div>
+    </div>
 
-        <?php if (isset($error)) echo "<p class='text-red-500 text-center mb-4 bg-red-100 p-3 rounded-lg'>$error</p>"; ?>
+    <!-- Right half: Login Form -->
+    <div class="md:w-1/2 flex flex-col justify-center items-center p-8 bg-white">
+        <div class="w-full max-w-md">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Sign In</h2>
 
-        <form method="post" class="space-y-4">
-            <div>
-                <input type="text" name="username" placeholder="Username" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
-            </div>
+            <?php if (isset($error)) echo "<p class='text-red-500 text-center mb-4 bg-red-100 p-3 rounded-lg'>$error</p>"; ?>
 
-            <div class="relative">
-                <input type="password" name="password" placeholder="Password" required class="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 password-field">
-                <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 password-toggle">
-                    👁
+            <form method="post" class="space-y-4">
+                <div>
+                    <input type="text" name="username" placeholder="Username" required class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
+                </div>
+
+                <div class="relative">
+                    <input type="password" name="password" placeholder="Password" required class="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 password-field">
+                    <button type="button" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 password-toggle">
+                        👁
+                    </button>
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
+                    Login
                 </button>
-            </div>
-
-            <button type="submit" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white p-3 rounded-lg hover:from-blue-600 hover:to-purple-700 transition duration-300 transform hover:scale-105 shadow-lg">
-                Login
-            </button>
-        </form>
+            </form>
+        </div>
     </div>
 
     <script>

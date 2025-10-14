@@ -37,13 +37,61 @@ class User {
     public function __construct() {
         $this->db = new Database();
     }
-    // Update main user info: bio, background, years_experience, email
-    public function updateUserInfo($user_id, $bio, $background, $years_experience, $email) {
+
+    public function register($username, $full_name, $email, $password) {
         try {
             $conn = $this->db->getConnection();
-            $sql = "UPDATE users SET bio = ?, background = ?, years_experience = ?, email = ? WHERE id = ?";
+
+            // Check if username already exists
+            $check_sql = "SELECT id FROM users WHERE username = ? OR email = ?";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("ss", $username, $email);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            if ($check_result->num_rows > 0) {
+                return false; // Username or email already exists
+            }
+
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+            // Insert new user
+            $sql = "INSERT INTO users (username, full_name, email, password) VALUES (?, ?, ?, ?)";
             $stmt = $conn->prepare($sql);
-            $stmt->bind_param("ssisi", $bio, $background, $years_experience, $email, $user_id);
+            $stmt->bind_param("ssss", $username, $full_name, $email, $hashed_password);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log("Error in register: " . $e->getMessage());
+            return false;
+        }
+    }
+    // Update main user info: bio, background, years_experience, email, full_name, username
+    public function updateUserInfo($user_id, $bio = null, $background = null, $years_experience = null, $email = null, $full_name = null, $username = null) {
+        try {
+            $conn = $this->db->getConnection();
+
+            // Username uniqueness check is handled by the caller
+
+            // Build dynamic update query
+            $updates = [];
+            $params = [];
+            $types = '';
+
+            if ($bio !== null) { $updates[] = "bio = ?"; $params[] = $bio; $types .= 's'; }
+            if ($background !== null) { $updates[] = "background = ?"; $params[] = $background; $types .= 's'; }
+            if ($years_experience !== null) { $updates[] = "years_experience = ?"; $params[] = $years_experience; $types .= 'i'; }
+            if ($email !== null) { $updates[] = "email = ?"; $params[] = $email; $types .= 's'; }
+            if ($full_name !== null) { $updates[] = "full_name = ?"; $params[] = $full_name; $types .= 's'; }
+            if ($username !== null) { $updates[] = "username = ?"; $params[] = $username; $types .= 's'; }
+
+            if (empty($updates)) return true;
+
+            $sql = "UPDATE users SET " . implode(', ', $updates) . " WHERE id = ?";
+            $params[] = $user_id;
+            $types .= 'i';
+
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param($types, ...$params);
             return $stmt->execute();
         } catch (Exception $e) {
             error_log("Error in updateUserInfo: " . $e->getMessage());
@@ -316,6 +364,7 @@ class User {
                 if (password_verify($password, $user['password'])) {
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['username'] = $user['username'];
+                    $_SESSION['full_name'] = $user['full_name'];
                     return $user;
                 }
             } else {
@@ -330,6 +379,7 @@ class User {
 
                     $_SESSION['user_id'] = $user['id'];
                     $_SESSION['username'] = $user['username'];
+                    $_SESSION['full_name'] = $user['full_name'];
                     return $user;
                 }
             }
@@ -762,7 +812,7 @@ class User {
 
     public function getFollowersList($user_id) {
         $conn = $this->db->getConnection();
-        $sql = "SELECT u.id, u.username, u.profile_pic FROM users u JOIN user_followers uf ON u.id = uf.follower_id WHERE uf.following_id = ? AND u.id != ? AND u.deleted_at IS NULL ORDER BY uf.created_at DESC";
+        $sql = "SELECT u.id, u.username, u.profile_pic, u.bio FROM users u JOIN user_followers uf ON u.id = uf.follower_id WHERE uf.following_id = ? AND u.id != ? AND u.deleted_at IS NULL ORDER BY uf.created_at DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ii", $user_id, $user_id);
         $stmt->execute();
@@ -776,7 +826,7 @@ class User {
 
     public function getFollowingList($user_id) {
         $conn = $this->db->getConnection();
-        $sql = "SELECT u.id, u.username, u.profile_pic FROM users u JOIN user_followers uf ON u.id = uf.following_id WHERE uf.follower_id = ? AND u.id != ? AND u.deleted_at IS NULL ORDER BY uf.created_at DESC";
+        $sql = "SELECT u.id, u.username, u.profile_pic, u.bio FROM users u JOIN user_followers uf ON u.id = uf.following_id WHERE uf.follower_id = ? AND u.id != ? AND u.deleted_at IS NULL ORDER BY uf.created_at DESC";
         $stmt = $conn->prepare($sql);
         $stmt->bind_param("ii", $user_id, $user_id);
         $stmt->execute();
